@@ -1,0 +1,37 @@
+name: 电量监控
+
+on:
+  schedule:
+    # 每30分钟运行一次
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: 设置Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: 安装依赖
+      run: pip install -r requirements.txt
+    
+    - name: 运行监控脚本
+      env:
+        # 可选：设置通知用的密钥
+        SCKEY: ${{ secrets.SCKEY }}  # Server酱密钥（微信通知）
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      run: python monitor.py
+    
+    - name: 提交数据到仓库
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/
+        git diff --staged --quiet || git commit -m "更新电量数据 $(date +'%Y-%m-%d %H:%M:%S')"
+        git push
