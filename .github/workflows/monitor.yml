@@ -4,17 +4,17 @@ on:
   schedule:
     # 每30分钟运行一次
     - cron: '*/30 * * * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch: # 允许手动触发
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: 设置Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
     
@@ -24,7 +24,7 @@ jobs:
     - name: 运行监控脚本
       env:
         # 可选：设置通知用的密钥
-        SCKEY: ${{ secrets.SCKEY }}  # Server酱密钥（微信通知）
+        SCKEY: ${{ secrets.SCKEY }} # Server酱密钥（微信通知）
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
       run: python monitor.py
     
