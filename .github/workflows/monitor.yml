@@ -1,10 +1,12 @@
-name: 电量监控
+name: 电量监控与报告
 
 on:
   schedule:
-    # 每30分钟运行一次
-    - cron: '*/30 * * * *'
-  workflow_dispatch: # 允许手动触发
+    # 每10分钟运行一次监控
+    - cron: '*/10 * * * *'
+    # 每天北京时间21:00生成报告（GitHub Actions 使用 UTC）
+    - cron: '0 13 * * *'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -15,27 +17,28 @@ permissions:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    
+    # 只在10分钟触发时运行
+    if: github.event.schedule == '*/10 * * * *' || github.event_name == 'workflow_dispatch'
+
     steps:
     - uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
-    
+
     - name: 设置Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-    
+
     - name: 安装依赖
       run: pip install -r requirements.txt
-    
+
     - name: 运行监控脚本
       env:
         SCKEY: ${{ secrets.SCKEY }}
-        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
       run: python monitor.py
-    
+
     - name: 提交数据到仓库
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,3 +48,29 @@ jobs:
         git add data/
         git diff --staged --quiet || git commit -m "更新电量数据 $(date +'%Y-%m-%d %H:%M:%S')"
         git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+
+  report:
+    runs-on: ubuntu-latest
+    # 只在北京时间21:00触发时运行
+    if: github.event.schedule == '0 13 * * *' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: 设置Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 安装依赖
+      run: pip install -r requirements.txt
+
+    - name: 生成并发送报告
+      env:
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        EMAIL_TO: 2788590428@qq.com
+        EMAIL_FROM: 2788590428@qq.com
+      run: python report.py
