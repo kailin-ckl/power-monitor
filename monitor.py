@@ -4,17 +4,31 @@ import json
 import os
 from datetime import datetime
 import re
+import sys
+import pytz
 
 URL = "http://www.wap.cnyiot.com/nat/pay.aspx?mid=19103082509"
 DATA_FILE = "data/power_data.json"
-ALERT_THRESHOLD = 20  # 低于20度时提醒
+ALERT_THRESHOLD = 20
+
+# 设置中国时区
+CHINA_TZ = pytz.timezone('Asia/Shanghai')
+
+def get_china_time():
+    """获取中国时区时间"""
+    return datetime.now(CHINA_TZ)
+
+def safe_console_text(text):
+    """返回当前控制台可安全输出的文本"""
+    encoding = sys.stdout.encoding or 'utf-8'
+    return str(text).encode(encoding, errors='replace').decode(encoding)
 
 def send_wechat_notification(title, content):
     """使用Server酱发送微信通知"""
     sckey = os.environ.get('SCKEY')
     if not sckey:
         return
-    
+
     url = f"https://sctapi.ftqq.com/{sckey}.send"
     data = {
         "title": title,
@@ -29,74 +43,76 @@ def fetch_power_info():
     """抓取电量信息"""
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0'
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
-        response = requests.get(URL, headers=headers, timeout=15)
+        response = requests.get(URL, headers=headers, timeout=15, allow_redirects=True)
         response.encoding = 'utf-8'
+
+        print(f"状态码: {response.status_code}")
+        print(f"URL: {response.url}")
+        print(f"内容长度: {len(response.text)}")
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 提取数据
         text = soup.get_text()
-        
-        # 使用正则表达式提取数字
+
+        print(f"页面内容预览: {safe_console_text(text[:300])}")
+
         remaining_kwh = None
         remaining_yuan = None
         price = None
-        
-        # 匹配剩余电量: XX.XX kWh
+
         kwh_match = re.search(r'剩余电量[：:]?\s*([\d.]+)\s*kWh', text, re.IGNORECASE)
         if kwh_match:
             remaining_kwh = float(kwh_match.group(1))
-        
-        # 匹配剩余金额: XX.XX 元
+
         yuan_match = re.search(r'剩余金额[：:]?\s*([\d.]+)\s*元', text)
         if yuan_match:
             remaining_yuan = float(yuan_match.group(1))
-        
-        # 匹配综合费用
+
         price_match = re.search(r'综合费用[：:]?\s*([\d.]+)\s*元[/每]?kWh', text)
         if price_match:
             price = float(price_match.group(1))
-        
+
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_china_time().isoformat(),
             "remaining_kwh": remaining_kwh,
             "remaining_yuan": remaining_yuan,
             "price_per_kwh": price,
-            "raw_text": text[:500]  # 保存部分原始文本用于调试
+            "raw_preview": text[:200]
         }
-        
+
         return data
-        
+
     except Exception as e:
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_china_time().isoformat(),
             "error": str(e)
         }
 
 def save_data(data):
     """保存数据到JSON文件"""
     os.makedirs("data", exist_ok=True)
-    
+
     all_data = []
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             all_data = json.load(f)
-    
+
     all_data.append(data)
-    
-    # 只保留最近30天的数据
-    all_data = all_data[-1440:]  # 30天 * 48次/天
-    
+    all_data = all_data[-1440:]
+
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(all_data, f, ensure_ascii=False, indent=2)
-    
-    print(f"数据已保存: {data}")
 
 def check_alert(data):
     """检查是否需要发送低电量提醒"""
     remaining = data.get('remaining_kwh')
-    if remaining and remaining < ALERT_THRESHOLD:
+    if remaining is not None and remaining < ALERT_THRESHOLD:
         title = f"⚠️ 电量不足提醒 - 仅剩 {remaining} 度"
         content = f"""当前电量: {remaining} kWh
 剩余金额: {data.get('remaining_yuan')} 元
@@ -107,17 +123,18 @@ def check_alert(data):
         print(f"已发送低电量提醒: {remaining} kWh")
 
 def main():
-    print(f"开始监控... {datetime.now()}")
-    
+    print(f"开始监控... {get_china_time()}")
+
     data = fetch_power_info()
     save_data(data)
     check_alert(data)
-    
+
     if data.get('error'):
         print(f"错误: {data['error']}")
         exit(1)
-    
+
     print(f"监控完成: 剩余电量 {data.get('remaining_kwh')} kWh")
+    print(f"时间: {data['timestamp']}")
 
 if __name__ == "__main__":
     main()
