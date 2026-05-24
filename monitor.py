@@ -9,7 +9,7 @@ import pytz
 
 URL = "http://www.wap.cnyiot.com/nat/pay.aspx?mid=19103082509"
 DATA_FILE = "data/power_data.json"
-ALERT_THRESHOLD = 20
+ALERT_THRESHOLD = 10
 
 # 设置中国时区
 CHINA_TZ = pytz.timezone('Asia/Shanghai')
