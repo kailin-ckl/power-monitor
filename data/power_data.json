@@ -320,5 +320,12 @@
     "remaining_yuan": null,
     "price_per_kwh": null,
     "raw_preview": "405{\"traceid\":\"0a15e15617800135347671188e6646\",\"lang\":\"cn\"}"
+  },
+  {
+    "timestamp": "2026-05-29T12:47:33.078869+08:00",
+    "remaining_kwh": null,
+    "remaining_yuan": null,
+    "price_per_kwh": null,
+    "raw_preview": "405{\"traceid\":\"0a15e14117800300529333889e5bbe\",\"lang\":\"cn\"}"
   }
 ]
